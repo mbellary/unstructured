@@ -225,6 +225,7 @@ def partition_pdf(
     exactly_one(filename=filename, file=file)
 
     languages = check_language_args(languages or [], ocr_languages)
+    print("==== ")
     return partition_pdf_or_image(
         filename=filename,
         file=file,
@@ -375,6 +376,7 @@ def partition_pdf_or_image(
 
     elif strategy == PartitionStrategy.OCR_ONLY:
         # NOTE(robinson): Catches file conversion warnings when running with PDFs
+        print('Running OCR only...')
         with warnings.catch_warnings():
             elements = _partition_pdf_or_image_with_ocr(
                 filename=filename,
@@ -382,6 +384,24 @@ def partition_pdf_or_image(
                 include_page_breaks=include_page_breaks,
                 languages=languages,
                 ocr_languages=ocr_languages,
+                is_image=is_image,
+                metadata_last_modified=metadata_last_modified or last_modified,
+                starting_page_number=starting_page_number,
+                password=password,
+                **kwargs,
+            )
+            out_elements = _process_uncategorized_text_elements(elements)
+
+    elif strategy == PartitionStrategy.VLM_ONLY:
+        # NOTE(robinson): Catches file conversion warnings when running with PDFs
+        print('Running VLM only...')
+        with warnings.catch_warnings():
+            elements = _partition_pdf_or_image_with_vlm(
+                filename=filename,
+                file=file,
+                include_page_breaks=include_page_breaks,
+                languages=languages,
+                # ocr_languages=ocr_languages,
                 is_image=is_image,
                 metadata_last_modified=metadata_last_modified or last_modified,
                 starting_page_number=starting_page_number,
@@ -931,6 +951,7 @@ def _partition_pdf_or_image_with_ocr(
         for page_number, image in enumerate(
             convert_pdf_to_images(filename, file, password=password), start=starting_page_number
         ):
+            print('processed PDF file into image...')
             page_elements = _partition_pdf_or_image_with_ocr_from_image(
                 image=image,
                 languages=languages,
@@ -944,6 +965,57 @@ def _partition_pdf_or_image_with_ocr(
 
     return elements
 
+def _partition_pdf_or_image_with_vlm(
+    filename: str = "",
+    file: Optional[bytes | IO[bytes]] = None,
+    include_page_breaks: bool = False,
+    languages: Optional[list[str]] = None,
+    # ocr_languages: Optional[str] = None,
+    is_image: bool = False,
+    metadata_last_modified: Optional[str] = None,
+    starting_page_number: int = 1,
+    password: Optional[str] = None,
+    **kwargs: Any,
+):
+    """Partitions an image or PDF using OCR. For PDFs, each page is converted
+    to an image prior to processing."""
+
+    elements = []
+    if is_image:
+        images = []
+        image = PILImage.open(file) if file is not None else PILImage.open(filename)
+        images.append(image)
+
+        for page_number, image in enumerate(images, start=starting_page_number):
+            page_elements = _partition_pdf_or_image_with_vlm_from_image(
+                filename,
+                image=image,
+                languages=languages,
+                # ocr_languages=ocr_languages,
+                page_number=page_number,
+                include_page_breaks=include_page_breaks,
+                metadata_last_modified=metadata_last_modified,
+                **kwargs,
+            )
+            elements.extend(page_elements)
+    else:
+        for page_number, image in enumerate(
+            convert_pdf_to_images(filename, file, password=password), start=starting_page_number
+        ):
+            print('processed PDF file into image...')
+            page_elements = _partition_pdf_or_image_with_vlm_from_image(
+                filename,
+                image=image,
+                languages=languages,
+                # ocr_languages=ocr_languages,
+                page_number=page_number,
+                include_page_breaks=include_page_breaks,
+                metadata_last_modified=metadata_last_modified,
+                **kwargs,
+            )
+            elements.extend(page_elements)
+
+    return elements
 
 def _partition_pdf_or_image_with_ocr_from_image(
     image: PILImage.Image,
@@ -958,13 +1030,16 @@ def _partition_pdf_or_image_with_ocr_from_image(
     """Extract `unstructured` elements from an image using OCR and perform partitioning."""
 
     from unstructured.partition.utils.ocr_models.ocr_interface import OCRAgent
-
+    print('starting OCR Agent')
+    # Initialize the OCR Agent
     ocr_agent = OCRAgent.get_agent(language=ocr_languages)
+    print(f'OCR AGENT : {ocr_agent}' )
 
     # NOTE(christine): `pytesseract.image_to_string()` returns sorted text
     if ocr_agent.is_text_sorted():
         sort_mode = SORT_MODE_DONT
 
+    # detect and extract texts. returns List of LayoutElements
     ocr_data = ocr_agent.get_layout_elements_from_image(image=image)
 
     metadata = ElementMetadata(
@@ -991,6 +1066,54 @@ def _partition_pdf_or_image_with_ocr_from_image(
 
     return page_elements
 
+def _partition_pdf_or_image_with_vlm_from_image(
+    filename: str,
+    image: PILImage.Image,
+    languages: Optional[list[str]] = None,
+    ocr_languages: Optional[str] = None,
+    page_number: int = 1,
+    include_page_breaks: bool = False,
+    metadata_last_modified: Optional[str] = None,
+    sort_mode: str = SORT_MODE_XY_CUT,
+    **kwargs: Any,
+) -> list[Element]:
+    """Extract `unstructured` elements from an image using OCR and perform partitioning."""
+
+    from unstructured.partition.utils.vlm_models.vlm_interface import VLMAgent
+    print('starting OCR Agent')
+    # Initialize the OCR Agent
+    vlm_agent = VLMAgent.get_agent()
+    print(f'VLM AGENT : {vlm_agent}' )
+
+    if vlm_agent.is_text_sorted():
+        sort_mode = SORT_MODE_DONT
+
+    # detect and extract texts. returns List of LayoutElements
+    ocr_data = vlm_agent.get_layout_elements_from_image(image=image, filename=filename)
+
+    metadata = ElementMetadata(
+        last_modified=metadata_last_modified,
+        filetype=image.format,
+        page_number=page_number,
+        languages=languages,
+    )
+
+    # NOTE (yao): elements for a document is still stored as a list therefore at this step we have
+    # to convert the vector data structured ocr_data into a list
+    page_elements = ocr_data_to_elements(
+        ocr_data.as_list(),
+        image_size=image.size,
+        common_metadata=metadata,
+    )
+
+    sorted_page_elements = page_elements
+    if sort_mode != SORT_MODE_DONT:
+        sorted_page_elements = sort_page_elements(page_elements, sort_mode)
+
+    if include_page_breaks:
+        sorted_page_elements.append(PageBreak(text=""))
+
+    return page_elements
 
 def _process_uncategorized_text_elements(elements: list[Element]):
     """Processes a list of elements, creating a new list where elements with the

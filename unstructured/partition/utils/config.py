@@ -13,7 +13,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from unstructured.partition.utils.constants import OCR_AGENT_TESSERACT
+from unstructured.partition.utils.constants import (
+    OCR_AGENT_TESSERACT,
+    OCR_AGENT_PADDLE,
+    VLM_AGENT_QWEN)
 
 
 @lru_cache(maxsize=1)
@@ -24,7 +27,7 @@ def get_tempdir(dir: str) -> str:
 
 @dataclass
 class ENVConfig:
-    """class for configuring enviorment parameters"""
+    """class for configuring environment parameters"""
 
     def __post_init__(self):
         if self.GLOBAL_WORKING_DIR_ENABLED:
@@ -109,7 +112,12 @@ class ENVConfig:
     @property
     def OCR_AGENT(self) -> str:
         """OCR Agent to use"""
-        return self._get_string("OCR_AGENT", OCR_AGENT_TESSERACT)
+        return self._get_string("OCR_AGENT", OCR_AGENT_PADDLE)
+
+    @property
+    def VLM_AGENT(self) -> str:
+        """VLM Agent to use"""
+        return self._get_string("VLM_AGENT", VLM_AGENT_QWEN)
 
     @property
     def EXTRACT_IMAGE_BLOCK_CROP_HORIZONTAL_PAD(self) -> int:

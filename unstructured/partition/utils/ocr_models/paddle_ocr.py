@@ -75,7 +75,10 @@ class OCRAgentPaddle(OCRAgent):
         # have the mapping for paddle lang code
         # see CORE-2034
         ocr_data = self.agent.ocr(np.array(image), cls=True)
+        print(f'data from Paddle : {ocr_data}')
+
         ocr_regions = self.parse_data(ocr_data)
+        print(f'data after parsing : {ocr_regions}')
 
         return ocr_regions
 
@@ -138,7 +141,9 @@ class OCRAgentPaddle(OCRAgent):
                     text_region = build_text_region_from_coords(
                         x1, y1, x2, y2, text=cleaned_text, source=Source.OCR_PADDLE
                     )
+                    print(f'data during parsing : {text_region}')
                     text_regions.append(text_region)
+                    print(f'data during parsing : {text_regions}')
 
         # FIXME (yao): find out if paddle supports a vectorized output format so we can skip the
         # step of parsing a list

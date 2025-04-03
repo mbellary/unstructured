@@ -7,6 +7,7 @@ class Source(Enum):
     OCR_TESSERACT = "ocr_tesseract"
     OCR_PADDLE = "ocr_paddle"
     OCR_GOOGLEVISION = "ocr_googlevision"
+    VLM_QWEN = "vlm_qwen"
 
 
 class OCRMode(Enum):
@@ -205,3 +206,5 @@ TESSERACT_MAX_SIZE = 2147483647
 IMAGE_COLOR_DEPTH = 32
 
 HTML_MAX_PREDECESSOR_LEN = 15
+
+VLM_AGENT_QWEN = 'unstructured.partition.utils.vlm_models.qwen_ocr.VLMAgentQwen'
