@@ -16,6 +16,7 @@ class OCRMode(Enum):
 
 
 class PartitionStrategy:
+    VLM_ONLY = "vlm_only"
     AUTO = "auto"
     FAST = "fast"
     OCR_ONLY = "ocr_only"

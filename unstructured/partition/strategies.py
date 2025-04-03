@@ -12,6 +12,7 @@ def validate_strategy(strategy: str, is_image: bool = False):
         PartitionStrategy.AUTO,
         PartitionStrategy.FAST,
         PartitionStrategy.OCR_ONLY,
+        PartitionStrategy.VLM_ONLY,
         PartitionStrategy.HI_RES,
     ]
     if strategy not in valid_strategies:
