@@ -4,7 +4,8 @@ from functools import lru_cache
 from importlib import import_module
 from typing import TYPE_CHECKING
 
-#from unstructured.partition.utils.config import env_config
+
+from unstructured.partition.utils.config import env_config
 
 if TYPE_CHECKING:
     from PIL import Image as PILImage
@@ -22,7 +23,7 @@ class VLMAgent(ABC):
 
     @staticmethod
     def _get_vlm_agent_cls_qname() -> str:
-        vlm_agent_cls_qname = env_config.VLM_AGENT_QWEN
+        vlm_agent_cls_qname = env_config.VLM_AGENT
         return vlm_agent_cls_qname
 
     @staticmethod

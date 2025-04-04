@@ -6,12 +6,11 @@ from transformers import Qwen2_5_VLForConditionalGeneration, AutoTokenizer, Auto
 from unstructured.partition.pdf_image.inference_utils import build_text_region_from_coords
 from unstructured.partition.utils.constants import Source
 from unstructured.utils import requires_dependencies
-from vlm_interface import VLMAgent
+from unstructured.partition.utils.vlm_models.vlm_interface import VLMAgent
 from PIL import Image as PILImage
-
-if TYPE_CHECKING:
-    from unstructured_inference.inference.elements import TextRegions, TextRegion
-    from unstructured_inference.inference.layoutelement import LayoutElements
+from typing import TYPE_CHECKING
+from unstructured_inference.inference.elements import TextRegions, TextRegion
+from unstructured_inference.inference.layoutelement import LayoutElements
 
 QWEN_MODEL_NAME = 'Qwen/Qwen2.5-VL-3B-Instruct'
 QWEN_MESSAGES = [
@@ -73,6 +72,7 @@ class VLMAgentQwen(VLMAgent):
 
     def is_text_sorted(self):
         return False
+
 
     def get_layout_from_image(self, image: PILImage.Image, filename: str) -> TextRegions:
         img_width, img_height = self.get_image_size(image)
