@@ -22,7 +22,7 @@ class VLMAgent(ABC):
 
     @staticmethod
     def _get_vlm_agent_cls_qname() -> str:
-        vlm_agent_cls_qname = "qwen_ocr.VLMAgentQwen"       #env_config.VLM_AGENT
+        vlm_agent_cls_qname = env_config.VLM_AGENT_QWEN
         return vlm_agent_cls_qname
 
     @staticmethod
