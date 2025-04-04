@@ -45,7 +45,10 @@ class VLMAgentQwen(VLMAgent):
 
 
     def load_model_and_processor(self):
-        model = Qwen2_5_VLForConditionalGeneration.from_pretrained(QWEN_MODEL_NAME, torch_dtype=torch.float16, device_map="cuda")
+        model = Qwen2_5_VLForConditionalGeneration.from_pretrained(QWEN_MODEL_NAME,
+                                                                   torch_dtype=torch.float16,
+                                                                   attn_implementation="flash_attention_2",
+                                                                   device_map="cuda")
         processor = AutoProcessor.from_pretrained(QWEN_MODEL_NAME)
         return model, processor
 
