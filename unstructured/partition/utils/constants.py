@@ -208,4 +208,33 @@ IMAGE_COLOR_DEPTH = 32
 
 HTML_MAX_PREDECESSOR_LEN = 15
 
-VLM_AGENT_QWEN = 'unstructured.partition.utils.vlm_models.qwen_ocr.VLMAgentQwen'
+QWEN_CONF = {
+    "model_name" : 'Qwen/Qwen2.5-VL-3B-Instruct',
+    "messages" :  [
+            {
+            "role": "system",
+            "content": "You are an expert at extracting structured text from image documents."
+            },
+            {
+              "role": "user",
+              "content": [
+                          {
+                            "type": "image",
+                            "image": "",
+                            "resized_height": "",
+                            "resized_width": ""
+                          },
+                          {
+                            "type": "text",
+                            "text": "Spotting all the text in the image with line-level, and output in JSON format."
+                          }
+              ]
+            }
+        ],
+    "img_max_width" : 1250,
+    "img_max_height" : 1750,
+    "unrecognized_text" : "UncategorizedText",
+    "vlm_agent_qwen" : 'unstructured.partition.utils.vlm_models.qwen_ocr.VLMAgentQwen',
+    "device" : "cuda",
+    "max_new_tokens" : 4096
+}

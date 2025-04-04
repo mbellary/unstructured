@@ -5,7 +5,7 @@ import ast
 
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoTokenizer, AutoProcessor
 from unstructured.partition.pdf_image.inference_utils import build_text_region_from_coords
-from unstructured.partition.utils.constants import Source
+from unstructured.partition.utils.constants import Source, QWEN_CONF
 from unstructured.utils import requires_dependencies
 from unstructured.partition.utils.vlm_models.vlm_interface import VLMAgent
 from PIL import Image as PILImage
@@ -13,31 +13,31 @@ from typing import TYPE_CHECKING
 from unstructured_inference.inference.elements import TextRegions, TextRegion
 from unstructured_inference.inference.layoutelement import LayoutElements
 
-QWEN_MODEL_NAME = 'Qwen/Qwen2.5-VL-3B-Instruct'
-QWEN_MESSAGES = [
-            {
-            "role": "system",
-            "content": "You are an expert at extracting structured text from image documents."
-            },
-            {
-              "role": "user",
-              "content": [
-                          {
-                            "type": "image",
-                            "image": "",
-                            "resized_height": "",
-                            "resized_width": ""
-                          },
-                          {
-                            "type": "text",
-                            "text": "Spotting all the text in the image with line-level, and output in JSON format."
-                          }
-              ]
-            }
-        ]
-MAX_WIDTH = 1250
-MAX_HEIGHT = 1750
-UNCATEGORIZED_TEXT = "UncategorizedText"
+# QWEN_MODEL_NAME = 'Qwen/Qwen2.5-VL-3B-Instruct'
+# QWEN_MESSAGES = [
+#             {
+#             "role": "system",
+#             "content": "You are an expert at extracting structured text from image documents."
+#             },
+#             {
+#               "role": "user",
+#               "content": [
+#                           {
+#                             "type": "image",
+#                             "image": "",
+#                             "resized_height": "",
+#                             "resized_width": ""
+#                           },
+#                           {
+#                             "type": "text",
+#                             "text": "Spotting all the text in the image with line-level, and output in JSON format."
+#                           }
+#               ]
+#             }
+#         ]
+# MAX_WIDTH = 1250
+# MAX_HEIGHT = 1750
+# UNCATEGORIZED_TEXT = "UncategorizedText"
 
 
 class VLMAgentQwen(VLMAgent):
@@ -46,25 +46,25 @@ class VLMAgentQwen(VLMAgent):
 
 
     def load_model_and_processor(self):
-        model = Qwen2_5_VLForConditionalGeneration.from_pretrained(QWEN_MODEL_NAME,
+        model = Qwen2_5_VLForConditionalGeneration.from_pretrained(QWEN_CONF['model_name'],
                                                                    torch_dtype=torch.float16,
                                                                    attn_implementation="flash_attention_2",
-                                                                   device_map="cuda")
-        processor = AutoProcessor.from_pretrained(QWEN_MODEL_NAME)
+                                                                   device_map=QWEN_CONF['device'])
+        processor = AutoProcessor.from_pretrained(QWEN_CONF['model_name'])
         return model, processor
 
     def get_image_size(self, image:PILImage.Image) -> tuple[float, float]:
         img_width, img_height = image.size
 
-        if img_width > MAX_WIDTH or img_height > MAX_HEIGHT:
+        if img_width > QWEN_CONF['img_max_width'] or img_height > QWEN_CONF['img_max_height']:
             aspect_ratio = img_width / img_height
-            new_width = min(MAX_WIDTH, int(MAX_HEIGHT * aspect_ratio))
-            new_height = min(MAX_HEIGHT, int(MAX_WIDTH / aspect_ratio))
+            new_width = min(QWEN_CONF['img_max_width'] , int(QWEN_CONF['img_max_height'] * aspect_ratio))
+            new_height = min(QWEN_CONF['img_max_height'], int(QWEN_CONF['img_max_width'] / aspect_ratio))
             return (new_width, new_height)
         return img_width, img_height
 
     def get_updated_messages(self, filename: str, width: float, height: float) -> list[dict]:
-        messages = copy.deepcopy(QWEN_MESSAGES)
+        messages = copy.deepcopy(QWEN_CONF['messages'])
         messages[1]['content'][0]["image"] = filename
         messages[1]['content'][0]["resized_height"] = height
         messages[1]['content'][0]["resized_width"] = width
@@ -87,8 +87,8 @@ class VLMAgentQwen(VLMAgent):
             images=[image],
             padding=True,
             return_tensors="pt",
-        ).to("cuda")
-        generated_ids = self.agent_model.generate(**inputs, max_new_tokens=4096)
+        ).to(QWEN_CONF['device'])
+        generated_ids = self.agent_model.generate(**inputs, max_new_tokens=QWEN_CONF['max_new_tokens'])
         generated_ids_trimmed = [out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
         raw_output = self.agent_processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         print(raw_output[0])
@@ -104,7 +104,7 @@ class VLMAgentQwen(VLMAgent):
             element_coords=ocr_regions.element_coords,
             texts=ocr_regions.texts,
             element_class_ids=np.zeros(ocr_regions.texts.shape),
-            element_class_id_map={0: UNCATEGORIZED_TEXT},
+            element_class_id_map={0: QWEN_CONF['unrecognized_text']},
         )
 
     @requires_dependencies("unstructured_inference")

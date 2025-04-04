@@ -16,7 +16,7 @@ from typing import Optional
 from unstructured.partition.utils.constants import (
     OCR_AGENT_TESSERACT,
     OCR_AGENT_PADDLE,
-    VLM_AGENT_QWEN)
+    QWEN_CONF)
 
 
 @lru_cache(maxsize=1)
@@ -117,7 +117,7 @@ class ENVConfig:
     @property
     def VLM_AGENT(self) -> str:
         """VLM Agent to use"""
-        return self._get_string("VLM_AGENT", VLM_AGENT_QWEN)
+        return self._get_string("VLM_AGENT", QWEN_CONF['vlm_agent_qwen'])
 
     @property
     def EXTRACT_IMAGE_BLOCK_CROP_HORIZONTAL_PAD(self) -> int:
