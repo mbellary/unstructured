@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 import torch
+import ast
 
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoTokenizer, AutoProcessor
 from unstructured.partition.pdf_image.inference_utils import build_text_region_from_coords
@@ -107,10 +108,17 @@ class VLMAgentQwen(VLMAgent):
         )
 
     @requires_dependencies("unstructured_inference")
-    def parse_raw_output(self, raw_output : list[dict]) -> TextRegions:
+    def parse_raw_output(self, raw_output : str) -> TextRegions:
         text_regions : list[TextRegion] = []
 
-        for region in raw_output:
+        lines = raw_output.splitlines()
+        for i, line in enumerate(lines):
+          if line == '```json':
+            json_data = "\n".join(lines[i+1: ])
+            json_data = json_data.split("```")[0]
+            break
+
+        for region in ast.literal_eval(json_data):
             x1, y1, x2, y2 = region['bbox_2d']
             text = region['text_content']
 
@@ -121,8 +129,6 @@ class VLMAgentQwen(VLMAgent):
                 text_region = build_text_region_from_coords(
                     x1, y1, x2, y2, text=cleaned_text, source=Source.VLM_QWEN
                 )
-            print(f'text region : {text_region}')
             text_regions.append(text_region)
-            print(f'text regions : {text_regions}')
 
         return TextRegions.from_list(text_regions)
