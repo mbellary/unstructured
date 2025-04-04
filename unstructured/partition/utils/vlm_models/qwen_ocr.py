@@ -78,7 +78,7 @@ class VLMAgentQwen(VLMAgent):
         img_width, img_height = self.get_image_size(image)
         messages = self.get_updated_messages(filename, img_width, img_height)
         text = self.agent_processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = self.agent_model(
+        inputs = self.agent_processor(
             text=[text],
             images=[image],
             padding=True,
