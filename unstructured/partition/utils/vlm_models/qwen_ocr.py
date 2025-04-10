@@ -13,32 +13,6 @@ from typing import TYPE_CHECKING
 from unstructured_inference.inference.elements import TextRegions, TextRegion
 from unstructured_inference.inference.layoutelement import LayoutElements
 
-# QWEN_MODEL_NAME = 'Qwen/Qwen2.5-VL-3B-Instruct'
-# QWEN_MESSAGES = [
-#             {
-#             "role": "system",
-#             "content": "You are an expert at extracting structured text from image documents."
-#             },
-#             {
-#               "role": "user",
-#               "content": [
-#                           {
-#                             "type": "image",
-#                             "image": "",
-#                             "resized_height": "",
-#                             "resized_width": ""
-#                           },
-#                           {
-#                             "type": "text",
-#                             "text": "Spotting all the text in the image with line-level, and output in JSON format."
-#                           }
-#               ]
-#             }
-#         ]
-# MAX_WIDTH = 1250
-# MAX_HEIGHT = 1750
-# UNCATEGORIZED_TEXT = "UncategorizedText"
-
 
 class VLMAgentQwen(VLMAgent):
     def __init__(self):
@@ -63,11 +37,12 @@ class VLMAgentQwen(VLMAgent):
             return (new_width, new_height)
         return img_width, img_height
 
-    def get_updated_messages(self, filename: str, width: float, height: float) -> list[dict]:
+    def get_updated_messages(self, filename: str, width: float, height: float, prompt: str) -> list[dict]:
         messages = copy.deepcopy(QWEN_CONF['messages'])
         messages[1]['content'][0]["image"] = filename
         messages[1]['content'][0]["resized_height"] = height
         messages[1]['content'][0]["resized_width"] = width
+        messages[1]['content'][1]["text"] = prompt
         return messages
 
     def get_text_from_image(self, image: PILImage.Image) -> str:
@@ -77,10 +52,9 @@ class VLMAgentQwen(VLMAgent):
     def is_text_sorted(self):
         return False
 
-
-    def get_layout_from_image(self, image: PILImage.Image, filename: str) -> TextRegions:
+    def get_vlm_response(self, image: PILImage.Image, filename: str, prompt: str) -> str:
         img_width, img_height = self.get_image_size(image)
-        messages = self.get_updated_messages(filename, img_width, img_height)
+        messages = self.get_updated_messages(filename, img_width, img_height, prompt)
         text = self.agent_processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = self.agent_processor(
             text=[text],
@@ -92,14 +66,45 @@ class VLMAgentQwen(VLMAgent):
         generated_ids_trimmed = [out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
         raw_output = self.agent_processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         print(raw_output[0])
-        text_regions = self.parse_raw_output(raw_output[0])
+        lines = raw_output[0].splitlines()
+        for i, line in enumerate(lines):
+          if line == '```json':
+            json_data = "\n".join(lines[i+1: ])
+            json_data = json_data.split("```")[0]
+            break
+        return json_data
 
+    def post_process_raw_output(self, raw_output: str) -> dict:
+        total_withdrawal = 0
+        total_deposits = 0
+        for details in ast.literal_eval(raw_output):
+            for transaction in details["transactions"]:
+                if 'inward' in transaction["transaction_type"].lower():
+                    total_deposits += transaction['amount']
+                elif 'to' in transaction["transaction_type"].lower():
+                    total_withdrawal += transaction['amount']
+                elif 'interest earned' in transaction["transaction_type"].lower():
+                    total_deposits += transaction['amount']
+            processed_output = copy.deepcopy(details)
+            processed_output['total_withdrawal'] = total_withdrawal
+            processed_output['total_deposits'] = total_deposits
+        return processed_output
+
+
+    def get_layout_from_image_without_bbox(self, image: PILImage.Image, filename: str, prompt:str) -> dict:
+        vlm_output = self.get_vlm_response(image, filename, prompt)
+        processed_output = self.post_process_raw_output(vlm_output)
+        return processed_output
+
+    def get_layout_from_image(self, image: PILImage.Image, filename: str, prompt:str) -> TextRegions:
+        vlm_output = self.get_vlm_response(image, filename, prompt)
+        text_regions = self.parse_raw_output(vlm_output)
         return text_regions
         
 
     @requires_dependencies("unstructured_inference")
-    def get_layout_elements_from_image(self, image: PILImage.Image, filename: str) -> LayoutElements:
-        ocr_regions = self.get_layout_from_image(image, filename)
+    def get_layout_elements_from_image(self, image: PILImage.Image, filename: str, prompt:str) -> LayoutElements:
+        ocr_regions = self.get_layout_from_image(image, filename, prompt)
         return LayoutElements(
             element_coords=ocr_regions.element_coords,
             texts=ocr_regions.texts,
@@ -111,14 +116,14 @@ class VLMAgentQwen(VLMAgent):
     def parse_raw_output(self, raw_output : str) -> TextRegions:
         text_regions : list[TextRegion] = []
 
-        lines = raw_output.splitlines()
-        for i, line in enumerate(lines):
-          if line == '```json':
-            json_data = "\n".join(lines[i+1: ])
-            json_data = json_data.split("```")[0]
-            break
+        # lines = raw_output.splitlines()
+        # for i, line in enumerate(lines):
+        #   if line == '```json':
+        #     json_data = "\n".join(lines[i+1: ])
+        #     json_data = json_data.split("```")[0]
+        #     break
 
-        for region in ast.literal_eval(json_data):
+        for region in ast.literal_eval(raw_output):
             x1, y1, x2, y2 = region['bbox_2d']
             text = region['text_content']
 

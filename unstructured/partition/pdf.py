@@ -143,12 +143,14 @@ def partition_pdf(
     extract_image_block_to_payload: bool = False,
     starting_page_number: int = 1,
     extract_forms: bool = False,
+    extract_bbox: bool = False,
     form_extraction_skip_tables: bool = True,
     password: Optional[str] = None,
     pdfminer_line_margin: Optional[float] = None,
     pdfminer_char_margin: Optional[float] = None,
     pdfminer_line_overlap: Optional[float] = None,
     pdfminer_word_margin: Optional[float] = 0.185,
+    vlm_prompt: str = "",
     **kwargs: Any,
 ) -> list[Element]:
     """Parses a pdf document into a list of interpreted elements.
@@ -247,6 +249,8 @@ def partition_pdf(
         pdfminer_char_margin=pdfminer_char_margin,
         pdfminer_line_overlap=pdfminer_line_overlap,
         pdfminer_word_margin=pdfminer_word_margin,
+        extract_bbox = extract_bbox,
+        vlm_prompt = vlm_prompt,
         **kwargs,
     )
 
@@ -267,6 +271,7 @@ def partition_pdf_or_image(
     extract_image_block_to_payload: bool = False,
     starting_page_number: int = 1,
     extract_forms: bool = False,
+    extract_bbox: bool = False,
     form_extraction_skip_tables: bool = True,
     password: Optional[str] = None,
     pdfminer_line_margin: Optional[float] = None,
@@ -275,6 +280,7 @@ def partition_pdf_or_image(
     pdfminer_word_margin: Optional[float] = 0.185,
     ocr_agent: str = OCR_AGENT_TESSERACT,
     table_ocr_agent: str = OCR_AGENT_TESSERACT,
+    vlm_prompt: str = "",
     **kwargs: Any,
 ) -> list[Element]:
     """Parses a pdf or image document into a list of interpreted elements."""
@@ -406,6 +412,8 @@ def partition_pdf_or_image(
                 metadata_last_modified=metadata_last_modified or last_modified,
                 starting_page_number=starting_page_number,
                 password=password,
+                extract_bbox = extract_bbox,
+                vlm_prompt = vlm_prompt,
                 **kwargs,
             )
             out_elements = _process_uncategorized_text_elements(elements)
@@ -915,7 +923,7 @@ def _partition_pdf_with_pdfparser(
     return elements
 
 
-def _partition_pdf_or_image_with_ocr(
+def _partition_pdf_or_image_with_ocr (
     filename: str = "",
     file: Optional[bytes | IO[bytes]] = None,
     include_page_breaks: bool = False,
@@ -975,6 +983,8 @@ def _partition_pdf_or_image_with_vlm(
     metadata_last_modified: Optional[str] = None,
     starting_page_number: int = 1,
     password: Optional[str] = None,
+    extract_bbox: bool = False,
+    vlm_prompt: str = "",
     **kwargs: Any,
 ):
     """Partitions an image or PDF using OCR. For PDFs, each page is converted
@@ -995,6 +1005,8 @@ def _partition_pdf_or_image_with_vlm(
                 page_number=page_number,
                 include_page_breaks=include_page_breaks,
                 metadata_last_modified=metadata_last_modified,
+                extract_bbox = extract_bbox,
+                vlm_prompt = vlm_prompt,
                 **kwargs,
             )
             elements.extend(page_elements)
@@ -1011,6 +1023,8 @@ def _partition_pdf_or_image_with_vlm(
                 page_number=page_number,
                 include_page_breaks=include_page_breaks,
                 metadata_last_modified=metadata_last_modified,
+                extract_bbox = extract_bbox,
+                vlm_prompt=vlm_prompt,
                 **kwargs,
             )
             elements.extend(page_elements)
@@ -1075,8 +1089,10 @@ def _partition_pdf_or_image_with_vlm_from_image(
     include_page_breaks: bool = False,
     metadata_last_modified: Optional[str] = None,
     sort_mode: str = SORT_MODE_XY_CUT,
+    extract_bbox: bool = False,
+    vlm_prompt: str = "",
     **kwargs: Any,
-) -> list[Element]:
+) -> list[Element | dict]:
     """Extract `unstructured` elements from an image using OCR and perform partitioning."""
 
     from unstructured.partition.utils.vlm_models.vlm_interface import VLMAgent
@@ -1089,29 +1105,32 @@ def _partition_pdf_or_image_with_vlm_from_image(
         sort_mode = SORT_MODE_DONT
 
     # detect and extract texts. returns List of LayoutElements
-    ocr_data = vlm_agent.get_layout_elements_from_image(image=image, filename=filename)
+    if extract_bbox:
+        ocr_data = vlm_agent.get_layout_elements_from_image(image=image, filename=filename, vlm_prompt=vlm_prompt)
 
-    metadata = ElementMetadata(
-        last_modified=metadata_last_modified,
-        filetype=image.format,
-        page_number=page_number,
-        languages=languages,
-    )
+        metadata = ElementMetadata(
+            last_modified=metadata_last_modified,
+            filetype=image.format,
+            page_number=page_number,
+            languages=languages,
+        )
 
-    # NOTE (yao): elements for a document is still stored as a list therefore at this step we have
-    # to convert the vector data structured ocr_data into a list
-    page_elements = ocr_data_to_elements(
-        ocr_data.as_list(),
-        image_size=image.size,
-        common_metadata=metadata,
-    )
+        # NOTE (yao): elements for a document is still stored as a list therefore at this step we have
+        # to convert the vector data structured ocr_data into a list
+        page_elements = ocr_data_to_elements(
+            ocr_data.as_list(),
+            image_size=image.size,
+            common_metadata=metadata,
+        )
 
-    sorted_page_elements = page_elements
-    if sort_mode != SORT_MODE_DONT:
-        sorted_page_elements = sort_page_elements(page_elements, sort_mode)
+        sorted_page_elements = page_elements
+        if sort_mode != SORT_MODE_DONT:
+            sorted_page_elements = sort_page_elements(page_elements, sort_mode)
 
-    if include_page_breaks:
-        sorted_page_elements.append(PageBreak(text=""))
+        if include_page_breaks:
+            sorted_page_elements.append(PageBreak(text=""))
+    else:
+        page_elements = vlm_agent.get_layout_from_image_without_bbox(image=image, filename=filename, vlm_prompt=vlm_prompt)
 
     return page_elements
 

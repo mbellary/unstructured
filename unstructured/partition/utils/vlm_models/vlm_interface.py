@@ -35,11 +35,16 @@ class VLMAgent(ABC):
         return loaded_class()
 
     @abstractmethod
-    def get_layout_from_image(self, image: PILImage.Image, filename: str) -> TextRegions:
+    def get_layout_from_image_without_bbox(self, image: PILImage.Image, filename: str, prompt: str) -> dict:
         pass
 
     @abstractmethod
-    def get_layout_elements_from_image(self, image: PILImage.Image) -> LayoutElements:
+    def get_layout_from_image(self, image: PILImage.Image, filename: str, prompt: str) -> TextRegions:
+        pass
+
+
+    @abstractmethod
+    def get_layout_elements_from_image(self, image: PILImage.Image, prompt: str) -> LayoutElements:
         pass
 
     @abstractmethod

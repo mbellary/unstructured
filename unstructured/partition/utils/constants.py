@@ -209,7 +209,7 @@ IMAGE_COLOR_DEPTH = 32
 HTML_MAX_PREDECESSOR_LEN = 15
 
 QWEN_CONF = {
-    "model_name" : 'Qwen/Qwen2.5-VL-3B-Instruct',
+    "model_name" : 'Qwen/Qwen2.5-VL-7B-Instruct',
     "messages" :  [
             {
             "role": "system",
@@ -226,7 +226,7 @@ QWEN_CONF = {
                           },
                           {
                             "type": "text",
-                            "text": "Spotting all the text in the image with line-level, and output in JSON format."
+                            "text": ""
                           }
               ]
             }
