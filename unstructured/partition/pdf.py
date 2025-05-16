@@ -1106,7 +1106,7 @@ def _partition_pdf_or_image_with_vlm_from_image(
 
     # detect and extract texts. returns List of LayoutElements
     if extract_bbox:
-        ocr_data = vlm_agent.get_layout_elements_from_image(image=image, filename=filename, vlm_prompt=vlm_prompt)
+        ocr_data = vlm_agent.get_layout_elements_from_image(image=image, filename=filename, prompt=vlm_prompt)
 
         metadata = ElementMetadata(
             last_modified=metadata_last_modified,
@@ -1130,7 +1130,7 @@ def _partition_pdf_or_image_with_vlm_from_image(
         if include_page_breaks:
             sorted_page_elements.append(PageBreak(text=""))
     else:
-        page_elements = vlm_agent.get_layout_from_image_without_bbox(image=image, filename=filename, vlm_prompt=vlm_prompt)
+        page_elements = vlm_agent.get_layout_from_image_without_bbox(image=image, filename=filename, prompt=vlm_prompt)
 
     return page_elements
 
